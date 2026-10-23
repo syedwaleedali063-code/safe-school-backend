@@ -1,16 +1,21 @@
 import { GoogleGenAI } from "@google/genai";
 
 export default async function handler(req, res) {
+  // Explicit CORS headers to prevent browser blocks
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
+  res.setHeader(
+    'Access-Control-Allow-Headers',
+    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
+  );
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
 
   if (req.method !== 'POST') {
-    return res.status(405).json({ success: false, error: 'Method not allowed' });
+    return res.status(405).json({ success: false, message: 'Method not allowed' });
   }
 
   try {
@@ -47,13 +52,13 @@ export default async function handler(req, res) {
     const resultJson = JSON.parse(cleanJsonText);
 
     if (resultJson.isValid) {
-      return.status(200).json({
+      return res.status(200).json({
         success: true,
         message: "ID Card successfully verified by Gemini AI!",
         details: resultJson.reason
       });
     } else {
-      return.status(400).json({
+      return res.status(400).json({
         success: false,
         message: "Verification failed: The image does not appear to be a valid Student ID or fee voucher.",
         details: resultJson.reason
@@ -62,6 +67,6 @@ export default async function handler(req, res) {
 
   } catch (error) {
     console.error("Gemini Verification Error:", error);
-    return.status(500).json({ success: false, message: "Internal server error during AI verification." });
+    return res.status(500).json({ success: false, message: "Internal server error during AI verification." });
   }
 }
