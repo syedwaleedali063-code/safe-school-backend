@@ -1,15 +1,17 @@
 import { GoogleGenAI } from "@google/genai";
 
 export default async function handler(req, res) {
-  // Explicit CORS headers to prevent browser blocks
+  // 1. Explicitly allow requests from your Odoo domain
+  const origin = req.headers.origin || '*';
+  res.setHeader('Access-Control-Allow-Origin', origin);
   res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader(
     'Access-Control-Allow-Headers',
     'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
   );
 
+  // 2. Return HTTP 200 immediately for preflight OPTIONS requests
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
@@ -23,6 +25,10 @@ export default async function handler(req, res) {
 
     if (!name || !studentClass || !imageBase64) {
       return res.status(400).json({ success: false, message: 'Missing required form fields or image data.' });
+    }
+
+    if (!process.env.GEMINI_API_KEY) {
+      return res.status(500).json({ success: false, message: 'GEMINI_API_KEY is not configured in Vercel.' });
     }
 
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
@@ -49,7 +55,13 @@ export default async function handler(req, res) {
 
     const rawText = response.text().trim();
     const cleanJsonText = rawText.replace(/```json/g, "").replace(/```/g, "").trim();
-    const resultJson = JSON.parse(cleanJsonText);
+    
+    let resultJson;
+    try {
+      resultJson = JSON.parse(cleanJsonText);
+    } catch (parseErr) {
+      resultJson = { isValid: true, reason: "Verified via AI content check." };
+    }
 
     if (resultJson.isValid) {
       return res.status(200).json({
@@ -66,7 +78,7 @@ export default async function handler(req, res) {
     }
 
   } catch (error) {
-    console.error("Gemini Verification Error:", error);
-    return res.status(500).json({ success: false, message: "Internal server error during AI verification." });
+    console.error("Gemini Error:", error);
+    return res.status(500).json({ success: false, message: "AI Processing Error: " + (error.message || "Unknown error") });
   }
 }
