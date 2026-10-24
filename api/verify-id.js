@@ -41,37 +41,19 @@ export default async function handler(req, res) {
 
     const prompt = `Analyze this uploaded document image. Does this image look like a valid Student ID Card, School ID, or Fee Voucher? Respond strictly in valid JSON format with no markdown formatting blocks, like this: {"isValid": true, "reason": "Clear student ID card detected"}`;
 
-    const modelsToTry = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-3.8-flash'];
-    let response = null;
-
-    for (const modelName of modelsToTry) {
-      try {
-        response = await ai.models.generateContent({
-          model: modelName,
-          contents: [
-            {
-              inlineData: {
-                mimeType: mimeType,
-                data: base64Data
-              }
-            },
-            prompt
-          ]
-        });
-        if (response) break;
-      } catch (err) {
-        console.warn(`Model ${modelName} unavailable, trying next...`);
-      }
-    }
-
-    // Fallback safety net: If all models are overloaded with 503, grant access automatically so users aren't blocked
-    if (!response) {
-      return res.status(200).json({
-        success: true,
-        message: "ID Card successfully verified via fallback system!",
-        details: "Auto-approved due to temporary high server demand."
-      });
-    }
+    // Using the stable production model gemini-1.5-flash strictly
+    const response = await ai.models.generateContent({
+      model: 'gemini-1.5-flash',
+      contents: [
+        {
+          inlineData: {
+            mimeType: mimeType,
+            data: base64Data
+          }
+        },
+        prompt
+      ]
+    });
 
     const rawText = response.text ? response.text().trim() : "";
     const cleanJsonText = rawText.replace(/```json/g, "").replace(/```/g, "").trim();
@@ -80,22 +62,25 @@ export default async function handler(req, res) {
     try {
       resultJson = JSON.parse(cleanJsonText);
     } catch (parseErr) {
-      resultJson = { isValid: true, reason: "Verified via AI content check." };
+      return res.status(500).json({ success: false, message: "AI response parsing failed: " + rawText });
     }
 
-    return res.status(200).json({
-      success: true,
-      message: "ID Card successfully verified by Gemini AI!",
-      details: resultJson.reason || "Valid document format."
-    });
+    if (resultJson.isValid) {
+      return res.status(200).json({
+        success: true,
+        message: "ID Card successfully verified by Gemini AI!",
+        details: resultJson.reason
+      });
+    } else {
+      return res.status(400).json({
+        success: false,
+        message: "Verification failed: The image does not appear to be a valid Student ID or fee voucher.",
+        details: resultJson.reason
+      });
+    }
 
   } catch (error) {
     console.error("Gemini Error:", error);
-    // Graceful fallback for any unexpected errors
-    return res.status(200).json({
-      success: true,
-      message: "ID Card verified successfully.",
-      details: "Bypassed due to high traffic."
-    });
+    return res.status(500).json({ success: false, message: "AI Verification Error: " + (error.message || "Unknown error") });
   }
 }
