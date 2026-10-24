@@ -41,9 +41,9 @@ export default async function handler(req, res) {
 
     const prompt = `Analyze this uploaded document image. Does this image look like a valid Student ID Card, School ID, or Fee Voucher? Respond strictly in valid JSON format with no markdown formatting blocks, like this: {"isValid": true, "reason": "Clear student ID card detected"}`;
 
-    // Correct structure for the @google/genai SDK
+    // Updated to the current model ID
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3.8-flash',
       contents: [
         {
           inlineData: {
