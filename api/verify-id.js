@@ -41,8 +41,9 @@ export default async function handler(req, res) {
 
     const prompt = `Analyze this uploaded document image. Does this image look like a valid Student ID Card, School ID, or Fee Voucher? Respond strictly in valid JSON format with no markdown formatting blocks, like this: {"isValid": true, "reason": "Clear student ID card detected"}`;
 
-    // 25-second execution promise to allow full vision processing
-    const callAI = ai.models.generateContent({
+    console.log("Starting Gemini API request with model gemini-3.8-flash...");
+
+    const response = await ai.models.generateContent({
       model: 'gemini-3.8-flash',
       contents: [
         {
@@ -55,11 +56,7 @@ export default async function handler(req, res) {
       ]
     });
 
-    const timeout = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('AI Processing Timeout (25s exceeded)')), 25000)
-    );
-
-    const response = await Promise.race([callAI, timeout]);
+    console.log("Gemini API response received successfully.");
 
     const rawText = response.text ? response.text().trim() : "";
     const cleanJsonText = rawText.replace(/```json/g, "").replace(/```/g, "").trim();
@@ -86,7 +83,7 @@ export default async function handler(req, res) {
     }
 
   } catch (error) {
-    console.error("Gemini Error:", error);
+    console.error("Gemini Error Details:", error);
     return res.status(500).json({ success: false, message: "AI Verification Error: " + (error.message || "Unknown error") });
   }
 }
