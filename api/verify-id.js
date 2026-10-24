@@ -41,8 +41,7 @@ export default async function handler(req, res) {
 
     const prompt = `Analyze this uploaded document image. Does this image look like a valid Student ID Card, School ID, or Fee Voucher? Respond strictly in valid JSON format with no markdown formatting blocks, like this: {"isValid": true, "reason": "Clear student ID card detected"}`;
 
-    console.log("Starting Gemini API request with model gemini-3.8-flash...");
-
+    // Using the current active free-tier model recommended for new API keys
     const response = await ai.models.generateContent({
       model: 'gemini-3.8-flash',
       contents: [
@@ -55,8 +54,6 @@ export default async function handler(req, res) {
         prompt
       ]
     });
-
-    console.log("Gemini API response received successfully.");
 
     const rawText = response.text ? response.text().trim() : "";
     const cleanJsonText = rawText.replace(/```json/g, "").replace(/```/g, "").trim();
@@ -83,7 +80,7 @@ export default async function handler(req, res) {
     }
 
   } catch (error) {
-    console.error("Gemini Error Details:", error);
+    console.error("Gemini Error:", error);
     return res.status(500).json({ success: false, message: "AI Verification Error: " + (error.message || "Unknown error") });
   }
 }
