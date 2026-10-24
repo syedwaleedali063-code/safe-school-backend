@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "main": "api/verify-id.js",
   "dependencies": {
-    "@google/genai": "latest"
+    "@google/genai": "^0.1.1"
+  },
+  "engines": {
+    "node": "20.x"
   }
 }
