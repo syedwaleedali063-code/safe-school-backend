@@ -41,34 +41,59 @@ export default async function handler(req, res) {
 
     const prompt = `Analyze this uploaded document image. Does this image look like a valid Student ID Card, School ID, or Fee Voucher? Respond strictly in valid JSON format with no markdown formatting blocks, like this: {"isValid": true, "reason": "Clear student ID card detected"}`;
 
-    // Using active supported production model endpoints
-    const modelsToTry = ['gemini-3.8-flash', 'gemini-flash-latest'];
+    // Exhaustive list of current and legacy production models to guarantee a match
+    const modelsToTry = [
+      'gemini-2.5-flash',
+      'gemini-2.0-flash',
+      'gemini-1.5-flash',
+      'gemini-1.5-pro',
+      'gemini-flash-latest',
+      'gemini-pro-latest'
+    ];
+
+    const callAIWithTimeout = async (modelName) => {
+      const promise = ai.models.generateContent({
+        model: modelName,
+        contents: [
+          {
+            inlineData: {
+              mimeType: mimeType,
+              data: base64Data
+            }
+          },
+          prompt
+        ]
+      });
+
+      const timeout = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('AI Request Timeout')), 6000)
+      );
+
+      return Promise.race([promise, timeout]);
+    };
+
     let response = null;
     let lastError = null;
 
     for (const modelName of modelsToTry) {
       try {
-        response = await ai.models.generateContent({
-          model: modelName,
-          contents: [
-            {
-              inlineData: {
-                mimeType: mimeType,
-                data: base64Data
-              }
-            },
-            prompt
-          ]
-        });
-        if (response) break;
+        console.log(`Attempting model: ${modelName}`);
+        response = await callAIWithTimeout(modelName);
+        if (response) {
+          console.log(`Success with model: ${modelName}`);
+          break;
+        }
       } catch (err) {
         lastError = err;
-        console.warn(`Model ${modelName} failed, trying next...`, err.message);
+        console.warn(`Model ${modelName} failed:`, err.message);
       }
     }
 
     if (!response) {
-      throw lastError || new Error("All AI verification models failed to respond.");
+      return res.status(500).json({ 
+        success: false, 
+        message: "AI Verification Failed: All available model endpoints are currently busy or restricted. Last error: " + (lastError?.message || "Unknown error")
+      });
     }
 
     const rawText = response.text ? response.text().trim() : "";
