@@ -41,56 +41,25 @@ export default async function handler(req, res) {
 
     const prompt = `Analyze this uploaded document image. Does this image look like a valid Student ID Card, School ID, or Fee Voucher? Respond strictly in valid JSON format with no markdown formatting blocks, like this: {"isValid": true, "reason": "Clear student ID card detected"}`;
 
-    // Using the current active production models required for new keys
-    const modelsToTry = [
-      'gemini-3.8-flash',
-      'gemini-flash-latest'
-    ];
+    // 25-second execution promise to allow full vision processing
+    const callAI = ai.models.generateContent({
+      model: 'gemini-3.8-flash',
+      contents: [
+        {
+          inlineData: {
+            mimeType: mimeType,
+            data: base64Data
+          }
+        },
+        prompt
+      ]
+    });
 
-    const callAIWithTimeout = async (modelName) => {
-      const promise = ai.models.generateContent({
-        model: modelName,
-        contents: [
-          {
-            inlineData: {
-              mimeType: mimeType,
-              data: base64Data
-            }
-          },
-          prompt
-        ]
-      });
+    const timeout = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('AI Processing Timeout (25s exceeded)')), 25000)
+    );
 
-      const timeout = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('AI Request Timeout')), 8000)
-      );
-
-      return Promise.race([promise, timeout]);
-    };
-
-    let response = null;
-    let lastError = null;
-
-    for (const modelName of modelsToTry) {
-      try {
-        console.log(`Attempting model: ${modelName}`);
-        response = await callAIWithTimeout(modelName);
-        if (response) {
-          console.log(`Success with model: ${modelName}`);
-          break;
-        }
-      } catch (err) {
-        lastError = err;
-        console.warn(`Model ${modelName} failed:`, err.message);
-      }
-    }
-
-    if (!response) {
-      return res.status(500).json({ 
-        success: false, 
-        message: "AI Verification Failed: " + (lastError?.message || "All models unavailable.")
-      });
-    }
+    const response = await Promise.race([callAI, timeout]);
 
     const rawText = response.text ? response.text().trim() : "";
     const cleanJsonText = rawText.replace(/```json/g, "").replace(/```/g, "").trim();
