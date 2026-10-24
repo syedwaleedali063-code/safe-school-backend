@@ -41,19 +41,35 @@ export default async function handler(req, res) {
 
     const prompt = `Analyze this uploaded document image. Does this image look like a valid Student ID Card, School ID, or Fee Voucher? Respond strictly in valid JSON format with no markdown formatting blocks, like this: {"isValid": true, "reason": "Clear student ID card detected"}`;
 
-    // Using the stable production model gemini-1.5-flash strictly
-    const response = await ai.models.generateContent({
-      model: 'gemini-1.5-flash',
-      contents: [
-        {
-          inlineData: {
-            mimeType: mimeType,
-            data: base64Data
-          }
-        },
-        prompt
-      ]
-    });
+    // Using active supported production model endpoints
+    const modelsToTry = ['gemini-3.8-flash', 'gemini-flash-latest'];
+    let response = null;
+    let lastError = null;
+
+    for (const modelName of modelsToTry) {
+      try {
+        response = await ai.models.generateContent({
+          model: modelName,
+          contents: [
+            {
+              inlineData: {
+                mimeType: mimeType,
+                data: base64Data
+              }
+            },
+            prompt
+          ]
+        });
+        if (response) break;
+      } catch (err) {
+        lastError = err;
+        console.warn(`Model ${modelName} failed, trying next...`, err.message);
+      }
+    }
+
+    if (!response) {
+      throw lastError || new Error("All AI verification models failed to respond.");
+    }
 
     const rawText = response.text ? response.text().trim() : "";
     const cleanJsonText = rawText.replace(/```json/g, "").replace(/```/g, "").trim();
