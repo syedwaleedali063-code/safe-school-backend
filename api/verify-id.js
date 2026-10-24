@@ -1,7 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 
 export default async function handler(req, res) {
-  // 1. Explicitly allow requests from your Odoo domain
   const origin = req.headers.origin || '*';
   res.setHeader('Access-Control-Allow-Origin', origin);
   res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -11,7 +10,6 @@ export default async function handler(req, res) {
     'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
   );
 
-  // 2. Return HTTP 200 immediately for preflight OPTIONS requests
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
@@ -37,23 +35,27 @@ export default async function handler(req, res) {
     let mimeType = "image/jpeg";
     if (imageBase64.includes(";base64,")) {
       const parts = imageBase64.split(";base64,");
-      mimeType = parts[0].replace("data:", "");
+      mimeType = parts[0].replace("data:", "").replace(";", "").trim();
       base64Data = parts[1];
     }
 
-    const prompt = `Analyze this uploaded document image. Does this image look like a valid Student ID Card, School ID, or Fee Voucher? 
-    Respond strictly in valid JSON format with no markdown formatting blocks, like this:
-    {"isValid": true, "reason": "Clear student ID card detected"}`;
+    const prompt = `Analyze this uploaded document image. Does this image look like a valid Student ID Card, School ID, or Fee Voucher? Respond strictly in valid JSON format with no markdown formatting blocks, like this: {"isValid": true, "reason": "Clear student ID card detected"}`;
 
+    // Correct structure for the @google/genai SDK
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
       contents: [
-        { type: 'text', text: prompt },
-        { type: 'image', data: base64Data, mime_type: mimeType }
+        {
+          inlineData: {
+            mimeType: mimeType,
+            data: base64Data
+          }
+        },
+        prompt
       ]
     });
 
-    const rawText = response.text().trim();
+    const rawText = response.text ? response.text().trim() : "";
     const cleanJsonText = rawText.replace(/```json/g, "").replace(/```/g, "").trim();
     
     let resultJson;
