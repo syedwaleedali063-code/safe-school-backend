@@ -41,14 +41,10 @@ export default async function handler(req, res) {
 
     const prompt = `Analyze this uploaded document image. Does this image look like a valid Student ID Card, School ID, or Fee Voucher? Respond strictly in valid JSON format with no markdown formatting blocks, like this: {"isValid": true, "reason": "Clear student ID card detected"}`;
 
-    // Exhaustive list of current and legacy production models to guarantee a match
+    // Using the current active production models required for new keys
     const modelsToTry = [
-      'gemini-2.5-flash',
-      'gemini-2.0-flash',
-      'gemini-1.5-flash',
-      'gemini-1.5-pro',
-      'gemini-flash-latest',
-      'gemini-pro-latest'
+      'gemini-3.8-flash',
+      'gemini-flash-latest'
     ];
 
     const callAIWithTimeout = async (modelName) => {
@@ -66,7 +62,7 @@ export default async function handler(req, res) {
       });
 
       const timeout = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('AI Request Timeout')), 6000)
+        setTimeout(() => reject(new Error('AI Request Timeout')), 8000)
       );
 
       return Promise.race([promise, timeout]);
@@ -92,7 +88,7 @@ export default async function handler(req, res) {
     if (!response) {
       return res.status(500).json({ 
         success: false, 
-        message: "AI Verification Failed: All available model endpoints are currently busy or restricted. Last error: " + (lastError?.message || "Unknown error")
+        message: "AI Verification Failed: " + (lastError?.message || "All models unavailable.")
       });
     }
 
